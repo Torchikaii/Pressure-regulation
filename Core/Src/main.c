@@ -56,6 +56,9 @@ int mux_counter = 0;
 float targetPressure = 5.0;  // default pressure 5.0 bar
 float currentPressure = 0.0;
 uint8_t editMode = 1;  // start in edit mode
+uint32_t buttonPressTime[2] = {0, 0};
+uint8_t buttonHeld[2] = {0, 0};
+uint32_t lastUpdateTime = 0;  // Timer tracking for periodic updates
 
 /* USER CODE END PV */
 
@@ -66,8 +69,14 @@ static void MX_ADC_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
-/* USER CODE BEGIN PFP */
 
+/* USER CODE BEGIN PFP */
+void DisplayPressure(float pressure);
+float ReadPressure(void);
+void ControlRelay(float currentPressure, float targetPressure);
+void HandleButtonPress(uint8_t button);
+void CheckInputs(void);
+void ProcessButtonPress(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, uint8_t buttonIndex);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -85,6 +94,10 @@ void CheckInputs(void)
     editMode = 1;
 		//HAL_GPIO_TogglePin(RGB_LD1_GPIO_Port,RGB_LD1_Pin); // LED on
   }
+	
+	// Check button states for both buttons
+  ProcessButtonPress(Button_1_Kamami_GPIO_Port, Button_1_Kamami_Pin, 0);
+  ProcessButtonPress(Button_2_Kamami_GPIO_Port, Button_2_Kamami_Pin, 1);
 }
 
 void ProcessButtonPress(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, uint8_t buttonIndex)
@@ -99,7 +112,7 @@ void ProcessButtonPress(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, uint8_t buttonIn
     else
     {
       uint32_t pressDuration = HAL_GetTick() - buttonPressTime[buttonIndex];
-      if (pressDuration > 2000) // Long press
+      if (pressDuration > 700) // Long press
       {
         targetPressure += (buttonIndex == 0 ? 1.0 : -1.0);
         buttonPressTime[buttonIndex] = HAL_GetTick();
@@ -109,7 +122,7 @@ void ProcessButtonPress(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, uint8_t buttonIn
   else if (buttonHeld[buttonIndex]) // Button released
   {
     uint32_t pressDuration = HAL_GetTick() - buttonPressTime[buttonIndex];
-    if (pressDuration <= 2000) // Short press
+    if (pressDuration <= 700) // Short press
     {
       targetPressure += (buttonIndex == 0 ? 0.1 : -0.1);
     }
@@ -218,6 +231,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	DisplayPressure(targetPressure);
+	CheckInputs();
 	
 		if (counter % 100 == 0)
 		{
