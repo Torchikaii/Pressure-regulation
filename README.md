@@ -18,7 +18,7 @@ life, make sure you know what you're doing.
 ###simplified diagram is show below:
 
 ![Simplified diagram](
-https://github.com/Torchikaii/Pressure-regulation/simplified_diagram.png)
+https://github.com/Torchikaii/Pressure-regulation/blob/main/simplified_diagram.png)
 
 ###How it works ?
 The controller is trying to maintain pressure inside an air tank, if the
