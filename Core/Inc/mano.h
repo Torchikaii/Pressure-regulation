@@ -1,5 +1,6 @@
 extern int counter;
 extern int mux_counter;
+extern float currentPressure;
 
 // other code for examples, this is unused BEGIN
 #define LED1On() HAL_GPIO_WritePin(RGB_LD1_GPIO_Port,RGB_LD1_Pin,GPIO_PIN_SET) 
@@ -24,6 +25,6 @@ extern int mux_counter;
 #define COM3 ((unsigned char)~0x02)
 #define COM4 ((unsigned char)~0x01)
 
-void DisplayDigit(void);
+float ReadPressure(void);
 
 

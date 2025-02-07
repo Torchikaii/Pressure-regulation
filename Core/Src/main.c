@@ -56,6 +56,7 @@ int mux_counter = 0;
 float targetPressure = 5.0;  // default pressure 5.0 bar
 float currentPressure = 0.0;
 uint8_t editMode = 1;  // start in edit mode
+uint8_t flashState = 0;       // Used for flashing the display
 uint32_t buttonPressTime[2] = {0, 0};
 uint8_t buttonHeld[2] = {0, 0};
 uint32_t lastUpdateTime = 0;  // Timer tracking for periodic updates
@@ -69,7 +70,6 @@ static void MX_ADC_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
-
 /* USER CODE BEGIN PFP */
 void DisplayPressure(float pressure);
 float ReadPressure(void);
@@ -98,6 +98,50 @@ void CheckInputs(void)
 	// Check button states for both buttons
   ProcessButtonPress(Button_1_Kamami_GPIO_Port, Button_1_Kamami_Pin, 0);
   ProcessButtonPress(Button_2_Kamami_GPIO_Port, Button_2_Kamami_Pin, 1);
+}
+
+#define Vref 3.3
+#define Vstep Vref/4096 // 12 bit ADC
+float ReadPressure(void)
+{
+	
+	float pressure;
+	uint32_t ADCpa0;
+	float Vpa0;
+	static unsigned char bADCReady=1;
+	
+	//if (HAL_ADCEx_Calibration_Start(&hadc, ADC_SINGLE_ENDED) != HAL_OK) {
+//		Error_Handler();
+//	}
+	
+	if (bADCReady==1) {
+	// starting ADC
+		if (HAL_ADC_Start(&hadc) != HAL_OK) {
+			// Start Conversation Error 
+			Error_Handler();
+		} 
+		else bADCReady=0; // ADC conversion in progress, you cannot start another ADC conversion
+	}
+	
+	HAL_ADC_PollForConversion(&hadc, 10);
+
+	// Check if the continous conversion of regular channel is finished
+	if ((HAL_ADC_GetState(&hadc) & HAL_ADC_STATE_REG_EOC) == HAL_ADC_STATE_REG_EOC) {
+ 
+		//##-6- Get the converted value of regular channel ########################
+		ADCpa0 = HAL_ADC_GetValue(&hadc);// Read ADC result
+		Vpa0=ADCpa0*Vstep; // calculate voltage
+		//pressure = 3.8783 * Vpa0 - 1.2928;
+		pressure = 2 * 3.8783 * Vpa0 - 1.2928;
+		bADCReady=1; // you can start another ADC conversion
+	}
+ 
+	return pressure;
+	
+  //return ((adcValue * 3.3 / 4095.0 - 0.5) / 2.5) * 10.34214;
+	//return ((adcValue * 3.3 / 4095.0 - 0.5) / 2.5) * 100.34214;
+	
+	//return 6.2;
 }
 
 void ProcessButtonPress(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, uint8_t buttonIndex)
@@ -163,13 +207,13 @@ void DisplayPressure(float pressure)
     return;
   }
 	*/
-	
+		//	float tmp_pressure = pressure; // temporary pressure value
   int integerPart = (int)pressure;
-  int decimalPart = (int)((pressure - integerPart) * 10);
+  int decimalPart = (int)((pressure - integerPart) * 10); //incorect ?
 
    // Extract individual digits
   int digits[4] = {
-     integerPart % 10,        // Units digit
+     integerPart,        // Units digit
      decimalPart,             // First decimal digit
      -1                       // Placeholder if needed for further extension
   };
@@ -182,6 +226,18 @@ void DisplayPressure(float pressure)
 	// Use the counter to select which digit to display
    
 	
+}
+
+
+void ControlRelay(float currentPressure, float targetPressure) {
+  if (currentPressure < targetPressure - 0.1)
+  {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET); // Turn on relay
+  }
+  else if (currentPressure > targetPressure + 0.1)
+  {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET); // Turn off relay
+  }
 }
 /* USER CODE END 0 */
 
@@ -227,20 +283,40 @@ int main(void)
 	
   while (1)
   {
+		
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	DisplayPressure(targetPressure);
-	CheckInputs();
+
+		CheckInputs();
 	
+		if (!editMode) // We are in regulation mode
+      {
+        if (counter % 300 == 0) // Flash display at 5 Hz
+        {
+          flashState = !flashState;
+        }
+
+        if (flashState) DisplayPressure(currentPressure);
+				else GPIOC->ODR = ~(COM1 | COM2 | COM3 | COM4);
+
+        ControlRelay(currentPressure, targetPressure);
+      }
+      else // We are in edit mode
+      {
+        DisplayPressure(targetPressure);
+      }
+		
+		//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);	
+		/*
 		if (counter % 100 == 0)
 		{
 	
 		//CheckInputs();
-		//HAL_GPIO_TogglePin(RGB_LD1_GPIO_Port,RGB_LD1_Pin); // LED on
+		HAL_GPIO_TogglePin(RGB_LD1_GPIO_Port,RGB_LD1_Pin); // LED on
 		
 		}
-
+		*/
   }
   /* USER CODE END 3 */
 }
@@ -337,7 +413,7 @@ static void MX_ADC_Init(void)
 
   /** Configure for the selected ADC regular channel to be converted.
   */
-  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
@@ -496,7 +572,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_OutPB15_Pin|DS18B20_Pin_Pin|RGB_LD4_Pin|RGB_LD1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14|GPIO_OutPB15_Pin|DS18B20_Pin_Pin|RGB_LD4_Pin
+                          |RGB_LD1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -528,8 +605,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : GPIO_OutPB15_Pin DS18B20_Pin_Pin RGB_LD4_Pin RGB_LD1_Pin */
-  GPIO_InitStruct.Pin = GPIO_OutPB15_Pin|DS18B20_Pin_Pin|RGB_LD4_Pin|RGB_LD1_Pin;
+  /*Configure GPIO pins : PB14 GPIO_OutPB15_Pin DS18B20_Pin_Pin RGB_LD4_Pin
+                           RGB_LD1_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_OutPB15_Pin|DS18B20_Pin_Pin|RGB_LD4_Pin
+                          |RGB_LD1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

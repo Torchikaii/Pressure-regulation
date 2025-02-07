@@ -131,14 +131,20 @@ void SysTick_Handler(void)
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
 	
+	
 	mux_counter++;
 	if (mux_counter==10){
 		mux_counter=0;
+		
 	}
 	
 	counter++;
 	if (counter==1000) {
 		counter = 0;
+	}
+	
+	if (counter % 100 == 0) {
+		currentPressure = ReadPressure();
 	}
 	
   /* USER CODE END SysTick_IRQn 1 */
