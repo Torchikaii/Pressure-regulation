@@ -1,7 +1,7 @@
 # Pressure regulating system on STM32L073RZT6 microcontroller
 
-# Warning
-The project involves working with high voltages (230 V) that are dangerous for
+### Warning
+The project involves working with **high voltages (230 V)** that are dangerous for
 life, make sure you know what you're doing.
 
 ### The system consist of
@@ -28,7 +28,7 @@ the system by pressing OK button/switch.
 You can adjust the desired pressure by pressing two buttons on KAMAMI shield,
 one button decreases it and the other increases.
 By default system will start in edit mode, with 5.0 bar starting pressure. This
-value can be adjusted in Pressure-regulation/Core/Src/main.c `targetPressure`
+value can be adjusted in `Pressure-regulation/Core/Src/main.c` `targetPressure`
 global variable.
 
 ### Additional information
@@ -39,4 +39,4 @@ in the diagram).
 
 You may also want to calibrate your pressure sensor (analog manometer). For that
 you can adjust `pressure` variable located in
-Pressure-regulation/Core/Src/main.c  `ReadPressure(void)` function.
+`Pressure-regulation/Core/Src/main.c`  `ReadPressure(void)` function.
